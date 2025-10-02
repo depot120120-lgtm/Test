@@ -1,13 +1,31 @@
-name: macOS Screen Sharing Setup
+name: Linux VNC Setup
 
 on:
   workflow_dispatch:  # Run manually
 
 jobs:
   setup-vnc:
-    runs-on: namespace-profile-mac
+    runs-on: namespace-profile-default-arm64
 
     steps:
+      - name: Check Display Availability
+        run: |
+          echo "Checking if display is available..."
+          echo "DISPLAY environment variable: $DISPLAY"
+          echo "Checking for X11 display:"
+          xset q 2>/dev/null && echo "X11 display found" || echo "No X11 display available"
+          echo "Checking for Wayland display:"
+          echo "WAYLAND_DISPLAY: $WAYLAND_DISPLAY"
+          echo "Checking display processes:"
+          ps aux | grep -E '(Xorg|X11|wayland|display)' | grep -v grep || echo "No display processes found"
+          echo "Checking /tmp/.X11-unix:"
+          ls -la /tmp/.X11-unix/ 2>/dev/null || echo "No X11 sockets found"
+          echo "System information:"
+          uname -a
+          echo "Desktop environment check:"
+          echo "XDG_CURRENT_DESKTOP: $XDG_CURRENT_DESKTOP"
+          echo "XDG_SESSION_TYPE: $XDG_SESSION_TYPE"
+          
       - name: Enable macOS Screen Sharing
         run: |
           echo "Enabling macOS built-in Screen Sharing..."

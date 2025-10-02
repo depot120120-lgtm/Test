@@ -11,7 +11,7 @@ jobs:
       - name: Install TigerVNC
         run: |
           echo "Installing TigerVNC via Homebrew..."
-          brew install tigervnc
+          brew install tiger-vnc
 
       - name: Set VNC password
         run: |

@@ -39,29 +39,31 @@ jobs:
           # Try to get kickstart status with different approach
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -help | head -5 || echo "Kickstart help not available"
 
-      - name: Force Start VNC Server
+      - name: Alternative VNC Setup
         run: |
-          echo "Attempting to force start VNC server..."
-          # Method 1: Enable VNC via System Preferences approach
-          sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist com.apple.screensharing -dict Disabled -bool false
-          # Method 2: Enable VNC legacy connections
-          sudo defaults write /Library/Preferences/com.apple.RemoteDesktop.plist VNCLegacyConnectionsEnabled -bool true
-          # Method 3: Set VNC password using proper encoding
-          VNC_PASS_B64=$(echo -n "admin@123" | openssl base64)
-          sudo defaults write /Library/Preferences/com.apple.RemoteDesktop.plist VNCPassword -data "$VNC_PASS_B64"
-          # Method 4: Restart services
-          sudo launchctl stop com.apple.screensharing 2>/dev/null || echo "Service not running"
-          sudo launchctl start com.apple.screensharing
-          # Method 5: Restart ARD Agent with VNC enabled
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -restart -agent -menu
-          # Wait and check again
-          sleep 8
-          echo "Checking VNC port after force start:"
+          echo "Trying alternative VNC setup approach..."
+          # Skip problematic defaults commands and focus on what works
+          # Just restart ARD with proper VNC settings
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -deactivate -stop
+          sleep 2
+          # Reactivate with all VNC options
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -users runner -privs -all -restart -agent -menu
+          sleep 3
+          # Enable VNC legacy mode specifically
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvnclegacy -vnclegacy yes
+          sleep 2
+          # Set VNC password
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvncpw -vncpw admin@123
+          sleep 3
+          # Final restart
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -restart -agent
+          sleep 5
+          echo "Checking VNC port after alternative setup:"
           netstat -an | grep :5900 || lsof -i :5900 || echo "VNC still not listening"
-          # Check what's actually running
-          echo "Screen sharing processes:"
-          ps aux | grep -i screen | grep -v grep || echo "No screen processes"
-          echo "Launchctl status:"
+          # Check processes
+          echo "ARD processes:"
+          ps aux | grep ARD | grep -v grep || echo "No ARD processes"
+          echo "Screen sharing service:"
           sudo launchctl list | grep screen || echo "No screen services"
           
       - name: Configure Screen Sharing Settings

@@ -2,36 +2,27 @@ name: Linux VNC Setup
 
 on:
   workflow_dispatch:
-  push:
 
 jobs:
   setup-vnc:
     runs-on: namespace-profile-default-arm64
 
     steps:
-      - name: Install GNOME Desktop Environment
+      - name: Install Desktop Environment
         run: |
-          echo "Installing GNOME desktop environment..."
           sudo apt update
-          sudo apt install -y ubuntu-desktop-minimal
-          sudo apt install -y gnome-session gdm3
-          echo "GNOME installation completed"
-          
+          sudo apt install -y ubuntu-desktop-minimal gnome-session gdm3
+
       - name: Install VNC Server
         run: |
-          echo "Installing VNC server..."
           sudo apt install -y tightvncserver
-          echo "VNC server installation completed"
-          
+
       - name: Setup VNC Server
         run: |
-          echo "Setting up VNC server..."
-          # Create VNC password
           mkdir -p ~/.vnc
           echo "admin@123" | vncpasswd -f > ~/.vnc/passwd
           chmod 600 ~/.vnc/passwd
           
-          # Create VNC startup script for GNOME
           cat > ~/.vnc/xstartup << 'EOF'
 #!/bin/bash
 export XKL_XMODMAP_DISABLE=1
@@ -41,75 +32,23 @@ exec gnome-session
 EOF
           chmod +x ~/.vnc/xstartup
           
-          # Start VNC server on port 8000 (display :8000) with fastest resolution
           vncserver :8000 -geometry 1024x768 -depth 16
-          echo "VNC server started on port 8000"
-
-      - name: Verify VNC Status
-        run: |
-          echo "Checking VNC server status..."
-          # Wait a moment for services to start
-          sleep 5
-          # Check VNC processes
-          ps aux | grep vnc | grep -v grep || echo "No VNC processes found"
-          # Check VNC ports
-          echo "Checking VNC port 8000:"
-          netstat -an | grep :8000 || echo "Port 8000 not listening"
-          lsof -i :8000 || echo "Port 8000 not in use (lsof)"
-          # Check display
-          echo "Checking display:"
-          echo "DISPLAY: $DISPLAY"
-          # Check VNC log
-          echo "VNC log:"
-          cat ~/.vnc/*.log 2>/dev/null | tail -10 || echo "No VNC log found"
 
       - name: Setup Pinggy Tunnel
         run: |
-          echo "Setting up Pinggy tunnel..."
-          # Download pinggy
           wget https://s3.ap-south-1.amazonaws.com/public.pinggy.binaries/cli/v0.2.5/linux/arm64/pinggy
           chmod +x pinggy
-          
-          # Start pinggy tunnel in background
-          echo "Starting pinggy tunnel..."
           nohup ./pinggy -p 443 -R0:localhost:8000 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 2CKLdGYp967+force+tcp@free.pinggy.io > pinggy.log 2>&1 &
-          
-          # Wait for tunnel to establish
           sleep 10
-          
-          # Show pinggy log
-          echo "Pinggy tunnel log:"
-          cat pinggy.log || echo "No pinggy log found"
-          
-          # Check if pinggy is running
-          ps aux | grep pinggy | grep -v grep || echo "Pinggy not running"
 
-      - name: Show Connection Information
+      - name: Show Connection Info
         run: |
-          echo "=== Linux VNC Server Connection Information ==="
-          echo "VNC Server Status: TightVNC Server with GNOME"
-          echo "VNC Port: 8000 (display :8000)"
-          echo "VNC Password: admin@123"
-          echo "Resolution: 1024x768 @ 16-bit (optimized for speed)"
-          echo ""
-          echo "Network Information:"
-          echo "Local IP Address:"
-          IP_ADDR=$(hostname -I | awk '{print $1}' || echo "No IP found")
-          echo "$IP_ADDR"
-          echo ""
-          echo "Pinggy Tunnel Information:"
-          echo "Checking for pinggy tunnel URL..."
-          grep -o 'tcp://[^[:space:]]*' pinggy.log 2>/dev/null | head -1 || echo "No tunnel URL found yet"
-          echo ""
-          echo "Connection Instructions:"
-          echo "Local: Use VNC client to connect to $IP_ADDR:8000 with password 'admin@123'"
+          echo "VNC Server: localhost:8000"
+          echo "Password: admin@123"
+          echo "Resolution: 1024x768"
+          IP_ADDR=$(hostname -I | awk '{print $1}')
+          echo "Local IP: $IP_ADDR:8000"
           TUNNEL_URL=$(grep -o 'tcp://[^[:space:]]*' pinggy.log 2>/dev/null | head -1)
           if [ -n "$TUNNEL_URL" ]; then
-            echo "Remote: Use VNC client to connect to $TUNNEL_URL with password 'admin@123'"
-          else
-            echo "Remote: Tunnel URL not available yet, check pinggy.log"
+            echo "Remote URL: $TUNNEL_URL"
           fi
-          echo ""
-          echo "Port Status Check:"
-          netstat -an | grep :8000 | grep LISTEN || echo "Port 8000 not currently listening"
-          echo "==============================================="

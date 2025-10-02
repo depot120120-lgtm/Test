@@ -1,11 +1,8 @@
 name: Linux VNC Setup
 
 on:
-  workflow_dispatch:  # Run manually
+  workflow_dispatch:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   setup-vnc:

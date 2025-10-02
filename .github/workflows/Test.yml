@@ -1,4 +1,4 @@
-name: macOS TigerVNC Setup
+name: macOS Screen Sharing Setup
 
 on:
   workflow_dispatch:  # Run manually
@@ -8,48 +8,59 @@ jobs:
     runs-on: namespace-profile-mac
 
     steps:
-      - name: Install TigerVNC
+      - name: Enable macOS Screen Sharing
         run: |
-          echo "Installing TigerVNC via Homebrew..."
-          brew install tiger-vnc
+          echo "Enabling macOS built-in Screen Sharing..."
+          # Enable Screen Sharing (VNC) service
+          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+          # Enable Remote Management
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -clientopts -setvnclegacy -vnclegacy yes -clientopts -setvncpw -vncpw admin@123 -restart -agent -privs -all
+          echo "Screen Sharing enabled successfully"
 
-      - name: Set VNC password
+      - name: Verify Screen Sharing Status
         run: |
-          echo "Setting VNC password..."
-          mkdir -p ~/.vnc
-          # Find vncpasswd location
-          echo "Looking for vncpasswd..."
-          find /opt/homebrew -name vncpasswd -type f 2>/dev/null | head -1
-          VNCPASSWD_PATH=$(find /opt/homebrew -name vncpasswd -type f 2>/dev/null | head -1)
-          echo "Found vncpasswd at: $VNCPASSWD_PATH"
-          if [ -n "$VNCPASSWD_PATH" ]; then
-            echo "admin@123" | "$VNCPASSWD_PATH" -f > ~/.vnc/passwd
-            chmod 600 ~/.vnc/passwd
-          else
-            echo "vncpasswd not found, trying alternative method"
-            echo "admin@123" > ~/.vnc/passwd
-            chmod 600 ~/.vnc/passwd
-          fi
+          echo "Checking Screen Sharing status..."
+          # Check if Screen Sharing is running
+          sudo launchctl list | grep screensharing || echo "Screen Sharing service not found in launchctl"
+          # Check VNC port
+          netstat -an | grep :5900 || echo "VNC port 5900 not listening"
+          # Check Remote Management status
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -status
 
-      - name: Start VNC server
+      - name: Configure Screen Sharing Settings
         run: |
-          echo "Starting TigerVNC server on display :1..."
-          # Find vncserver location
-          VNCSERVER_PATH=$(find /opt/homebrew -name vncserver -type f 2>/dev/null | head -1)
-          echo "Found vncserver at: $VNCSERVER_PATH"
-          if [ -n "$VNCSERVER_PATH" ]; then
-            nohup "$VNCSERVER_PATH" :1 -geometry 1920x1080 -depth 24 >/tmp/vncserver.log 2>&1 &
-          else
-            echo "vncserver not found"
-            exit 1
-          fi
+          echo "Configuring Screen Sharing settings..."
+          # Set display resolution (if possible)
+          echo "Current display resolution:"
+          system_profiler SPDisplaysDataType | grep Resolution || echo "Could not get display resolution"
+          # Enable VNC viewers to control screen
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -allowAccessFor -allUsers -privs -all
+          echo "Screen Sharing configuration completed"
 
-      - name: Verify VNC server running
+      - name: Verify Screen Sharing Service
         run: |
-          echo "Checking VNC server process..."
-          ps aux | grep Xtightvnc | grep -v grep || echo "VNC server not running"
+          echo "Verifying Screen Sharing service is active..."
+          # Check for Screen Sharing processes
+          ps aux | grep -i screen | grep -v grep || echo "No screen sharing processes found"
+          # Check for VNC/ARD processes
+          ps aux | grep -i ard | grep -v grep || echo "No ARD processes found"
+          # Final port check
+          echo "Checking if VNC port 5900 is listening:"
+          lsof -i :5900 || echo "Port 5900 not in use"
 
-      - name: Show Mac IP
+      - name: Show Connection Information
         run: |
-          echo "IP address:"
-          ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo "No IP found"
+          echo "=== macOS Screen Sharing Connection Information ==="
+          echo "VNC Server Status: Screen Sharing Enabled"
+          echo "VNC Port: 5900"
+          echo "VNC Password: admin@123"
+          echo ""
+          echo "Network Information:"
+          echo "Primary IP Address:"
+          ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo "No primary IP found"
+          echo ""
+          echo "All network interfaces:"
+          ifconfig | grep "inet " | grep -v 127.0.0.1
+          echo ""
+          echo "To connect: Use VNC client to connect to <IP>:5900 with password 'admin@123'"
+          echo "==============================================="

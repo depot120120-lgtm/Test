@@ -1,39 +1,36 @@
-name: macOS Screen Sharing Setup
+name: macOS TigerVNC Setup
 
 on:
-  workflow_dispatch:   # Run manually from Actions tab
+  workflow_dispatch:  # Run manually
 
 jobs:
-  enable-vnc:
+  setup-vnc:
     runs-on: namespace-profile-mac
 
     steps:
-      - name: Enable Screen Sharing with VNC password
+      - name: Install TigerVNC
         run: |
-          echo "Enabling macOS Screen Sharing (VNC)..."
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -activate -configure -access -on \
-            -clientopts -setvnclegacy -vnclegacy yes \
-            -clientopts -setvncpw -vncpw 'admin@123' \
-            -restart -agent -privs -all
+          echo "Installing TigerVNC via Homebrew..."
+          brew install tigervnc
 
-      - name: Verify ARDAgent process
+      - name: Set VNC password
         run: |
-          echo "Checking ARDAgent process..."
-          ps aux | grep ARDAgent | grep -v grep || echo "ARDAgent not running"
+          echo "Setting VNC password..."
+          mkdir -p ~/.vnc
+          echo "admin@123" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
 
-      - name: Verify Screen Sharing / Remote Management Status
+      - name: Start VNC server
         run: |
-          echo "Checking launchctl for ARDAgent..."
-          launchctl list | grep com.apple.RemoteDesktop || echo "No RemoteDesktop service loaded"
+          echo "Starting TigerVNC server on display :1..."
+          nohup /opt/homebrew/bin/vncserver :1 -geometry 1920x1080 -depth 24 >/tmp/vncserver.log 2>&1 &
 
-          echo "Checking if VNCAlwaysStartOnConsole is set..."
-          defaults read /Library/Preferences/com.apple.RemoteManagement VNCAlwaysStartOnConsole || echo "VNC not configured"
-
-          echo "Checking if ARDServiceActive is enabled..."
-          defaults read /Library/Preferences/com.apple.RemoteManagement ARDServiceActive || echo "Remote Management not active"
-
-      - name: Show IP Address of macOS runner
+      - name: Verify VNC server running
         run: |
-          echo "Finding IP address..."
+          echo "Checking VNC server process..."
+          ps aux | grep Xtightvnc | grep -v grep || echo "VNC server not running"
+
+      - name: Show Mac IP
+        run: |
+          echo "IP address:"
           ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo "No IP found"

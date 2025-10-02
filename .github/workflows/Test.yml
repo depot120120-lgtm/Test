@@ -1,0 +1,33 @@
+name: macOS Screen Sharing Setup
+
+on:
+  workflow_dispatch:   # Run manually from Actions tab
+
+jobs:
+  enable-vnc:
+    runs-on: macos-latest
+
+    steps:
+      - name: Enable Screen Sharing with VNC password
+        run: |
+          echo "Enabling macOS Screen Sharing (VNC)..."
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on \
+            -clientopts -setvnclegacy -vnclegacy yes \
+            -clientopts -setvncpw -vncpw 'admin@123' \
+            -restart -agent -privs -all
+
+      - name: Verify ARDAgent process
+        run: |
+          echo "Checking ARDAgent process..."
+          ps aux | grep ARDAgent | grep -v grep || echo "ARDAgent not running"
+
+      - name: Verify Remote Management status
+        run: |
+          echo "Checking Remote Management status..."
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -status || true
+
+      - name: Show IP Address of macOS runner
+        run: |
+          echo "Finding IP address..."
+          ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo "No IP found"

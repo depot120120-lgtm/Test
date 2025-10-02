@@ -8,152 +8,80 @@ jobs:
     runs-on: namespace-profile-default-arm64
 
     steps:
-      - name: Check Display Availability
+      - name: Install GNOME Desktop Environment
         run: |
-          echo "Checking if display is available..."
-          echo "DISPLAY environment variable: $DISPLAY"
-          echo "Checking for X11 display:"
-          xset q 2>/dev/null && echo "X11 display found" || echo "No X11 display available"
-          echo "Checking for Wayland display:"
-          echo "WAYLAND_DISPLAY: $WAYLAND_DISPLAY"
-          echo "Checking display processes:"
-          ps aux | grep -E '(Xorg|X11|wayland|display)' | grep -v grep || echo "No display processes found"
-          echo "Checking /tmp/.X11-unix:"
-          ls -la /tmp/.X11-unix/ 2>/dev/null || echo "No X11 sockets found"
-          echo "System information:"
-          uname -a
-          echo "Desktop environment check:"
-          echo "XDG_CURRENT_DESKTOP: $XDG_CURRENT_DESKTOP"
-          echo "XDG_SESSION_TYPE: $XDG_SESSION_TYPE"
+          echo "Installing GNOME desktop environment..."
+          sudo apt update
+          sudo apt install -y ubuntu-desktop-minimal
+          sudo apt install -y gnome-session gdm3
+          echo "GNOME installation completed"
           
-      - name: Enable macOS Screen Sharing
+      - name: Install VNC Server
         run: |
-          echo "Enabling macOS built-in Screen Sharing..."
-          # Enable Screen Sharing via System Preferences method
-          sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist com.apple.screensharing -dict Disabled -bool false
-          # Enable VNC access
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -restart -agent -privs -all
-          # Set VNC password and enable legacy VNC
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvnclegacy -vnclegacy yes -clientopts -setvncpw -vncpw admin@123
-          # Start the Screen Sharing service
-          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || echo "Screen sharing plist already loaded"
-          # Alternative method to start VNC
-          sudo launchctl start com.apple.screensharing
-          echo "Screen Sharing enabled successfully"
+          echo "Installing VNC server..."
+          sudo apt install -y tightvncserver
+          echo "VNC server installation completed"
+          
+      - name: Setup VNC Server
+        run: |
+          echo "Setting up VNC server..."
+          # Create VNC password
+          mkdir -p ~/.vnc
+          echo "admin@123" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
+          
+          # Create VNC startup script for GNOME
+          cat > ~/.vnc/xstartup << 'EOF'
+#!/bin/bash
+export XKL_XMODMAP_DISABLE=1
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+exec gnome-session
+EOF
+          chmod +x ~/.vnc/xstartup
+          
+          # Start VNC server on port 8000 (display :8000)
+          vncserver :8000 -geometry 1920x1080 -depth 24
+          echo "VNC server started on port 8000"
 
-      - name: Verify Screen Sharing Status
+      - name: Verify VNC Status
         run: |
-          echo "Checking Screen Sharing status..."
+          echo "Checking VNC server status..."
           # Wait a moment for services to start
-          sleep 3
-          # Check if Screen Sharing is running
-          sudo launchctl list | grep screensharing || echo "Screen Sharing service not found in launchctl"
-          # Check VNC ports (both 8000 and 5900)
-          echo "Checking port 8000 (custom VNC port):"
-          netstat -an | grep :8000 || echo "VNC port 8000 not listening"
-          lsof -i :8000 || echo "Port 8000 not in use (lsof)"
-          echo "Checking port 5900 (default VNC port):"
-          netstat -an | grep :5900 || echo "VNC port 5900 not listening"
-          lsof -i :5900 || echo "Port 5900 not in use (lsof)"
-          # Check ARD Agent processes
-          ps aux | grep ARDAgent | grep -v grep || echo "No ARDAgent processes found"
-          # Try to get kickstart status with different approach
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -help | head -5 || echo "Kickstart help not available"
-
-      - name: Setup VNC on Port 8000
-        run: |
-          echo "Setting up VNC on custom port 8000..."
-          # Deactivate existing ARD setup
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -deactivate -stop
-          sleep 2
-          
-          # Configure VNC to use port 8000 instead of default 5900
-          echo "Configuring VNC for port 8000..."
-          sudo defaults write /Library/Preferences/com.apple.RemoteDesktop.plist VNCDisplayNumber -int 8000
-          sudo defaults write /Library/Preferences/com.apple.RemoteDesktop.plist VNCPort -int 8000
-          
-          # Reactivate with all VNC options
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -users runner -privs -all -restart -agent -menu
-          sleep 3
-          
-          # Enable VNC legacy mode specifically
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvnclegacy -vnclegacy yes
-          sleep 2
-          
-          # Set VNC password
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvncpw -vncpw admin@123
-          sleep 3
-          
-          # Start VNC server manually on port 8000 if ARD doesn't work
-          echo "Starting manual VNC server on port 8000..."
-          # Try to start a VNC server using built-in tools
-          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || echo "Screen sharing already loaded"
-          
-          # Alternative: Use osascript to enable Screen Sharing via System Preferences
-          echo "Enabling Screen Sharing via System Preferences..."
-          sudo osascript -e 'tell application "System Events" to set UI elements enabled to true' 2>/dev/null || echo "UI scripting not available"
-          
-          # Final restart
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -restart -agent
           sleep 5
-          
-          echo "Checking VNC port 8000 after setup:"
-          netstat -an | grep :8000 || lsof -i :8000 || echo "Port 8000 not listening yet"
-          echo "Also checking default port 5900:"
-          netstat -an | grep :5900 || lsof -i :5900 || echo "Port 5900 not listening"
-          
-          # Check processes
-          echo "ARD processes:"
-          ps aux | grep ARD | grep -v grep || echo "No ARD processes"
-          echo "Screen sharing service:"
-          sudo launchctl list | grep screen || echo "No screen services"
-          
-      - name: Configure Screen Sharing Settings
-        run: |
-          echo "Configuring Screen Sharing settings..."
-          # Set display resolution (if possible)
-          echo "Current display resolution:"
-          system_profiler SPDisplaysDataType | grep Resolution || echo "Could not get display resolution"
-          # Enable VNC viewers to control screen
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -allowAccessFor -allUsers -privs -all
-          echo "Screen Sharing configuration completed"
+          # Check VNC processes
+          ps aux | grep vnc | grep -v grep || echo "No VNC processes found"
+          # Check VNC ports
+          echo "Checking VNC port 8000:"
+          netstat -an | grep :8000 || echo "Port 8000 not listening"
+          lsof -i :8000 || echo "Port 8000 not in use (lsof)"
+          # Check display
+          echo "Checking display:"
+          echo "DISPLAY: $DISPLAY"
+          # Check VNC log
+          echo "VNC log:"
+          cat ~/.vnc/*.log 2>/dev/null | tail -10 || echo "No VNC log found"
 
-      - name: Verify Screen Sharing Service
-        run: |
-          echo "Verifying Screen Sharing service is active..."
-          # Check for Screen Sharing processes
-          ps aux | grep -i screen | grep -v grep || echo "No screen sharing processes found"
-          # Check for VNC/ARD processes
-          ps aux | grep -i ard | grep -v grep || echo "No ARD processes found"
-          # Final port checks for both ports
-          echo "Final verification - Checking if VNC port 8000 is listening:"
-          lsof -i :8000 || netstat -an | grep :8000 || echo "Port 8000 not in use"
-          echo "Final verification - Checking if VNC port 5900 is listening:"
-          lsof -i :5900 || netstat -an | grep :5900 || echo "Port 5900 not in use"
-          # Show all listening ports for reference
-          echo "All listening ports:"
-          netstat -an | grep LISTEN | grep -E ':(5900|8000|590[0-9])' || echo "No VNC-related ports listening"
+
 
       - name: Show Connection Information
         run: |
-          echo "=== macOS Screen Sharing Connection Information ==="
-          echo "VNC Server Status: Screen Sharing Enabled"
-          echo "Primary VNC Port: 8000 (custom)"
-          echo "Fallback VNC Port: 5900 (default)"
+          echo "=== Linux VNC Server Connection Information ==="
+          echo "VNC Server Status: TightVNC Server with GNOME"
+          echo "VNC Port: 8000 (display :8000)"
           echo "VNC Password: admin@123"
           echo ""
           echo "Network Information:"
           echo "Primary IP Address:"
-          IP_ADDR=$(ipconfig getifaddr en0 || ipconfig getifaddr en1 || echo "No primary IP found")
+          IP_ADDR=$(hostname -I | awk '{print $1}' || echo "No IP found")
           echo "$IP_ADDR"
           echo ""
           echo "All network interfaces:"
-          ifconfig | grep "inet " | grep -v 127.0.0.1
+          ip addr show | grep "inet " | grep -v 127.0.0.1
           echo ""
           echo "Connection Instructions:"
-          echo "Primary: Use VNC client to connect to $IP_ADDR:8000 with password 'admin@123'"
-          echo "Fallback: Use VNC client to connect to $IP_ADDR:5900 with password 'admin@123'"
+          echo "Use VNC client to connect to $IP_ADDR:8000 with password 'admin@123'"
           echo ""
           echo "Port Status Check:"
-          netstat -an | grep -E ':(8000|5900)' | grep LISTEN || echo "No VNC ports currently listening"
+          netstat -an | grep :8000 | grep LISTEN || echo "Port 8000 not currently listening"
           echo "==============================================="

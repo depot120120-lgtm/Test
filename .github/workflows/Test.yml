@@ -17,13 +17,16 @@ jobs:
         run: |
           echo "Setting VNC password..."
           mkdir -p ~/.vnc
-          echo "admin@123" | /opt/homebrew/bin/vncpasswd -f > ~/.vnc/passwd
+          # Find vncpasswd location
+          which vncpasswd || find /opt/homebrew -name vncpasswd 2>/dev/null || echo "vncpasswd not found"
+          # Use the correct path
+          echo "admin@123" | /opt/homebrew/Cellar/tiger-vnc/1.15.0/bin/vncpasswd -f > ~/.vnc/passwd
           chmod 600 ~/.vnc/passwd
 
       - name: Start VNC server
         run: |
           echo "Starting TigerVNC server on display :1..."
-          nohup /opt/homebrew/bin/vncserver :1 -geometry 1920x1080 -depth 24 >/tmp/vncserver.log 2>&1 &
+          nohup /opt/homebrew/Cellar/tiger-vnc/1.15.0/bin/vncserver :1 -geometry 1920x1080 -depth 24 >/tmp/vncserver.log 2>&1 &
 
       - name: Verify VNC server running
         run: |

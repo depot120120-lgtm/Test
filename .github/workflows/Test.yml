@@ -5,7 +5,7 @@ on:
 
 jobs:
   enable-vnc:
-    runs-on: macos-latest
+    runs-on: namespace-profile-mac
 
     steps:
       - name: Enable Screen Sharing with VNC password
@@ -22,10 +22,16 @@ jobs:
           echo "Checking ARDAgent process..."
           ps aux | grep ARDAgent | grep -v grep || echo "ARDAgent not running"
 
-      - name: Verify Remote Management status
+      - name: Verify Screen Sharing / Remote Management Status
         run: |
-          echo "Checking Remote Management status..."
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -status || true
+          echo "Checking launchctl for ARDAgent..."
+          launchctl list | grep com.apple.RemoteDesktop || echo "No RemoteDesktop service loaded"
+
+          echo "Checking if VNCAlwaysStartOnConsole is set..."
+          defaults read /Library/Preferences/com.apple.RemoteManagement VNCAlwaysStartOnConsole || echo "VNC not configured"
+
+          echo "Checking if ARDServiceActive is enabled..."
+          defaults read /Library/Preferences/com.apple.RemoteManagement ARDServiceActive || echo "Remote Management not active"
 
       - name: Show IP Address of macOS runner
         run: |

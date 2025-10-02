@@ -18,15 +18,31 @@ jobs:
           echo "Setting VNC password..."
           mkdir -p ~/.vnc
           # Find vncpasswd location
-          which vncpasswd || find /opt/homebrew -name vncpasswd 2>/dev/null || echo "vncpasswd not found"
-          # Use the correct path
-          echo "admin@123" | /opt/homebrew/Cellar/tiger-vnc/1.15.0/bin/vncpasswd -f > ~/.vnc/passwd
-          chmod 600 ~/.vnc/passwd
+          echo "Looking for vncpasswd..."
+          find /opt/homebrew -name vncpasswd -type f 2>/dev/null | head -1
+          VNCPASSWD_PATH=$(find /opt/homebrew -name vncpasswd -type f 2>/dev/null | head -1)
+          echo "Found vncpasswd at: $VNCPASSWD_PATH"
+          if [ -n "$VNCPASSWD_PATH" ]; then
+            echo "admin@123" | "$VNCPASSWD_PATH" -f > ~/.vnc/passwd
+            chmod 600 ~/.vnc/passwd
+          else
+            echo "vncpasswd not found, trying alternative method"
+            echo "admin@123" > ~/.vnc/passwd
+            chmod 600 ~/.vnc/passwd
+          fi
 
       - name: Start VNC server
         run: |
           echo "Starting TigerVNC server on display :1..."
-          nohup /opt/homebrew/Cellar/tiger-vnc/1.15.0/bin/vncserver :1 -geometry 1920x1080 -depth 24 >/tmp/vncserver.log 2>&1 &
+          # Find vncserver location
+          VNCSERVER_PATH=$(find /opt/homebrew -name vncserver -type f 2>/dev/null | head -1)
+          echo "Found vncserver at: $VNCSERVER_PATH"
+          if [ -n "$VNCSERVER_PATH" ]; then
+            nohup "$VNCSERVER_PATH" :1 -geometry 1920x1080 -depth 24 >/tmp/vncserver.log 2>&1 &
+          else
+            echo "vncserver not found"
+            exit 1
+          fi
 
       - name: Verify VNC server running
         run: |

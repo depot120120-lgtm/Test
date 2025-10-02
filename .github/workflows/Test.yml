@@ -11,22 +11,50 @@ jobs:
       - name: Enable macOS Screen Sharing
         run: |
           echo "Enabling macOS built-in Screen Sharing..."
-          # Enable Screen Sharing (VNC) service
-          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
-          # Enable Remote Management
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -clientopts -setvnclegacy -vnclegacy yes -clientopts -setvncpw -vncpw admin@123 -restart -agent -privs -all
+          # Enable Screen Sharing via System Preferences method
+          sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist com.apple.screensharing -dict Disabled -bool false
+          # Enable VNC access
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -restart -agent -privs -all
+          # Set VNC password and enable legacy VNC
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -configure -clientopts -setvnclegacy -vnclegacy yes -clientopts -setvncpw -vncpw admin@123
+          # Start the Screen Sharing service
+          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || echo "Screen sharing plist already loaded"
+          # Alternative method to start VNC
+          sudo launchctl start com.apple.screensharing
           echo "Screen Sharing enabled successfully"
 
       - name: Verify Screen Sharing Status
         run: |
           echo "Checking Screen Sharing status..."
+          # Wait a moment for services to start
+          sleep 3
           # Check if Screen Sharing is running
           sudo launchctl list | grep screensharing || echo "Screen Sharing service not found in launchctl"
           # Check VNC port
           netstat -an | grep :5900 || echo "VNC port 5900 not listening"
-          # Check Remote Management status
-          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -status
+          # Check with lsof
+          lsof -i :5900 || echo "Port 5900 not in use (lsof)"
+          # Check ARD Agent processes
+          ps aux | grep ARDAgent | grep -v grep || echo "No ARDAgent processes found"
+          # Try to get kickstart status with different approach
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -help | head -5 || echo "Kickstart help not available"
 
+      - name: Force Start VNC Server
+        run: |
+          echo "Attempting to force start VNC server..."
+          # Try different methods to start VNC
+          # Method 1: Direct launchctl start
+          sudo launchctl start com.apple.screensharing || echo "Method 1 failed"
+          # Method 2: Enable via defaults and restart
+          sudo defaults write /Library/Preferences/com.apple.RemoteDesktop.plist VNCLegacyConnectionsEnabled -bool true
+          sudo defaults write /Library/Preferences/com.apple.RemoteDesktop.plist VNCPassword -data $(echo -n "admin@123" | base64)
+          # Method 3: Restart ARD Agent
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -restart -agent
+          # Wait and check again
+          sleep 5
+          echo "Checking VNC port after force start:"
+          netstat -an | grep :5900 || lsof -i :5900 || echo "VNC still not listening"
+          
       - name: Configure Screen Sharing Settings
         run: |
           echo "Configuring Screen Sharing settings..."

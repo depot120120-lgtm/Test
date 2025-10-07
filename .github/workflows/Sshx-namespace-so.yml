@@ -5,7 +5,7 @@ on:
 
 jobs:
   run-sshx:
-    runs-on: namespace-profile-window # Only run on runner with this name
+    runs-on: depot-ubuntu-24.04-arm-16 # Only run on runner with this name
     steps:
       - name: Run SSHX
         run: curl -sSf https://sshx.io/get | sh -s run

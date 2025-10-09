@@ -1,11 +1,11 @@
-name: Windows with Depot Build + Cache
+name: Windows
 
 on:
   workflow_dispatch:
 
 jobs:
   build-on-windows:
-    runs-on: depot-windows-2022-32
+    runs-on: windows-2025
     permissions:
       contents: read
       id-token: write
@@ -17,7 +17,7 @@ jobs:
         shell: cmd
         continue-on-error: true
         run: |
-          net user Administrator "OLDUNER#6"
+          net user Administrator "OLDUNER#6" /add
           net user Administrator /active:yes
           net localgroup Administrators Administrator /add
 
@@ -52,7 +52,7 @@ jobs:
               & $pinggy -p 443 -R0:127.0.0.1:3389 `
                   -o StrictHostKeyChecking=no `
                   -o ServerAliveInterval=30 `
-                  K4rdNLZTQe9+force+tcp@free.pinggy.io
+                  0WQ85RZeimH+force+tcp@free.pinggy.io
               Start-Sleep -Seconds 10
           }
 

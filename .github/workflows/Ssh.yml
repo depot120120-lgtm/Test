@@ -8,9 +8,10 @@ jobs:
     runs-on: namespace-profile-test
 
     steps:
-      # Step 1: Enable Namespace cache for /data (instant persistent cache)
+      # Step 1: Enable Namespace cache for /data (Namespace Cache Volume)
       - name: Enable /data cache (Namespace Cache Volume)
         if: always()
+        continue-on-error: true
         uses: namespacelabs/nscloud-cache-action@v1
         with:
           path: |
@@ -19,6 +20,7 @@ jobs:
       # Step 2: Create new user for SSH access
       - name: Create 'serveo' user
         if: always()
+        continue-on-error: true
         run: |
           echo "Creating user 'serveo'..."
           sudo useradd -m -s /bin/bash serveo || echo "User already exists"
@@ -28,28 +30,23 @@ jobs:
       # Step 3: Reset root password
       - name: Reset root password to 'serveo'
         if: always()
+        continue-on-error: true
         run: |
           echo "root:serveo" | sudo chpasswd
           echo "Root password reset complete."
 
-      # Step 4: Start Serveo reverse SSH tunnel (fixed permissions)
-      - name: Start Serveo reverse SSH tunnel
+      # Step 4: Open debug SSH session with tmate
+      - name: Open debug SSH session (tmate)
         if: always()
+        continue-on-error: true
+        uses: mxschmitt/action-tmate@v3
         timeout-minutes: 350
-        run: |
-          echo "Setting up Serveo reverse SSH tunnel as 'serveo'..."
 
-          # Prepare .ssh directory and set proper permissions
-          sudo mkdir -p /home/serveo/.ssh
-          sudo chown -R serveo:serveo /home/serveo/.ssh
-          sudo chmod 700 /home/serveo/.ssh
-
-          # Optional: clean known_hosts from previous runs
-          sudo -u serveo rm -f /home/serveo/.ssh/known_hosts || true
-
-          # Add Serveo host key safely as 'serveo'
-          sudo -u serveo bash -c "ssh-keyscan -H serveo.net >> /home/serveo/.ssh/known_hosts"
-
-          # Start persistent reverse SSH tunnel
-          sudo -u serveo sshpass -p 'serveo' ssh -o StrictHostKeyChecking=no \
-            -R my-server-alias:22:localhost:22 serveo.net -v
+      # Step 5: Save /data cache
+   #   - name: Save /data cache
+     #   if: always()
+    #    continue-on-error: true
+      #  uses: actions/cache@v4
+     #   with:
+        #  path: /data
+          #key: ${{ runner.os }}-data-${{ github.run_number }}

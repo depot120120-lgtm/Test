@@ -5,7 +5,7 @@ on:
 
 jobs:
   serveo:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-arm-64
 
     steps:
       # Step 2: Restore /data cache

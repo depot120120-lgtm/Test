@@ -1,4 +1,4 @@
-name: Serveo SSH Tunnel with User and Data Cache
+name: Serveo SSH Tunnel with User and Data Cache (Root, Password Only)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: namespace-profile-test
 
     steps:
-      # Step 1: Enable Namespace cache for /data (Namespace Cache Volume)
+      # Step 1: Enable Namespace cache for /data (instant persistent cache)
       - name: Enable /data cache (Namespace Cache Volume)
         if: always()
         continue-on-error: true
@@ -17,7 +17,7 @@ jobs:
           path: |
             /data
 
-      # Step 2: Create new user for SSH access
+      # Step 2: Create 'serveo' user (optional, keep for reference)
       - name: Create 'serveo' user
         if: always()
         continue-on-error: true
@@ -28,25 +28,40 @@ jobs:
           echo "User 'serveo' created with password 'serveo'."
 
       # Step 3: Reset root password
-      - name: Reset root password to 'serveo'
+      - name: Reset root password
         if: always()
         continue-on-error: true
         run: |
           echo "root:serveo" | sudo chpasswd
           echo "Root password reset complete."
 
-      # Step 4: Open debug SSH session with tmate
-      - name: Open debug SSH session (tmate)
+      # Step 4: Enable root login via SSH
+      - name: Allow root login via SSH
         if: always()
         continue-on-error: true
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 350
+        run: |
+          echo "Enabling root login for SSH..."
+          sudo sed -i.bak -E 's/^#?PermitRootLogin\s+.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo service ssh restart || true
+          sudo service ssh status || true
 
-      # Step 5: Save /data cache
-   #   - name: Save /data cache
-     #   if: always()
-    #    continue-on-error: true
-      #  uses: actions/cache@v4
-     #   with:
-        #  path: /data
-          #key: ${{ runner.os }}-data-${{ github.run_number }}
+      # Step 5: Start SSH service
+      - name: Start SSH service
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "Starting SSH service..."
+          sudo service ssh start || true
+          sudo service ssh status || true
+
+      # Step 6: Start Serveo reverse SSH tunnel as root
+      - name: Start Serveo reverse SSH tunnel
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 350
+        run: |
+          echo "Starting Serveo reverse SSH tunnel as root with password only..."
+
+          # Run the tunnel as root using password authentication
+          sshpass -p 'serveo' ssh -o StrictHostKeyChecking=no \
+            -R my-server-alias:22:localhost:22 serveo.net -v

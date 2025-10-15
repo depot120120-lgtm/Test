@@ -64,4 +64,4 @@ jobs:
 
           # Run the tunnel as root using password authentication
           sshpass -p 'serveo' ssh -o StrictHostKeyChecking=no \
-            -R my-server-alias:22:localhost:22 serveo.net -v
+            -R my-root-1208:22:localhost:22 serveo.net -v

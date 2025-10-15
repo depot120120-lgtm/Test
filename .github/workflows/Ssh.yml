@@ -8,7 +8,7 @@ jobs:
     runs-on: namespace-profile-test
 
     steps:
-      # Step 1: Enable Namespace cache for /data
+      # Step 1: Enable Namespace cache for /data (instant persistent cache)
       - name: Enable /data cache (Namespace Cache Volume)
         if: always()
         uses: namespacelabs/nscloud-cache-action@v1
@@ -32,15 +32,24 @@ jobs:
           echo "root:serveo" | sudo chpasswd
           echo "Root password reset complete."
 
-      # Step 4: Start Serveo reverse SSH tunnel
+      # Step 4: Start Serveo reverse SSH tunnel (fixed permissions)
       - name: Start Serveo reverse SSH tunnel
         if: always()
         timeout-minutes: 350
         run: |
           echo "Setting up Serveo reverse SSH tunnel as 'serveo'..."
-          sudo -u serveo mkdir -p /home/serveo/.ssh
-          sudo -u serveo ssh-keyscan -H serveo.net >> /home/serveo/.ssh/known_hosts
+
+          # Prepare .ssh directory and set proper permissions
+          sudo mkdir -p /home/serveo/.ssh
+          sudo chown -R serveo:serveo /home/serveo/.ssh
+          sudo chmod 700 /home/serveo/.ssh
+
+          # Optional: clean known_hosts from previous runs
+          sudo -u serveo rm -f /home/serveo/.ssh/known_hosts || true
+
+          # Add Serveo host key safely as 'serveo'
+          sudo -u serveo bash -c "ssh-keyscan -H serveo.net >> /home/serveo/.ssh/known_hosts"
 
           # Start persistent reverse SSH tunnel
-          sudo -u serveo sshpass -p "serveo" ssh -o StrictHostKeyChecking=no \
+          sudo -u serveo sshpass -p 'serveo' ssh -o StrictHostKeyChecking=no \
             -R my-server-alias:22:localhost:22 serveo.net -v

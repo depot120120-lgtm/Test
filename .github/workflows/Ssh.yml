@@ -1,40 +1,38 @@
 name: Serveo SSH Tunnel with User and Data Cache
 
 on:
-  workflow_dispatch:  # manual trigger
+  workflow_dispatch:
 
 jobs:
   serveo:
-    runs-on: depot-ubuntu-24.04-arm-64
+    runs-on: namespace-profile-test
 
     steps:
-      # Step 2: Restore /data cache
-      - name: Restore /data cache
+      # Step 1: Enable Namespace cache for /data
+      - name: Enable /data cache (Namespace Cache Volume)
         if: always()
-        uses: actions/cache@v4
+        uses: namespacelabs/nscloud-cache-action@v1
         with:
-          path: /data
-          key: ${{ runner.os }}-data-${{ github.run_number }}
-          restore-keys: |
-            ${{ runner.os }}-data-
+          path: |
+            /data
 
-      # Step 3: Create new user for SSH access
+      # Step 2: Create new user for SSH access
       - name: Create 'serveo' user
         if: always()
         run: |
-          echo "Creating user 'serveo' with password..."
+          echo "Creating user 'serveo'..."
           sudo useradd -m -s /bin/bash serveo || echo "User already exists"
           echo "serveo:serveo" | sudo chpasswd
-          echo "User 'serveo' created. Password is 'serveo'."
+          echo "User 'serveo' created with password 'serveo'."
 
-      # Step 4: Reset root password
+      # Step 3: Reset root password
       - name: Reset root password to 'serveo'
         if: always()
         run: |
           echo "root:serveo" | sudo chpasswd
           echo "Root password reset complete."
 
-      # Step 5: Start Serveo reverse SSH tunnel
+      # Step 4: Start Serveo reverse SSH tunnel
       - name: Start Serveo reverse SSH tunnel
         if: always()
         timeout-minutes: 350
@@ -42,15 +40,7 @@ jobs:
           echo "Setting up Serveo reverse SSH tunnel as 'serveo'..."
           sudo -u serveo mkdir -p /home/serveo/.ssh
           sudo -u serveo ssh-keyscan -H serveo.net >> /home/serveo/.ssh/known_hosts
-          
-          # Start tunnel (persistent, verbose)
+
+          # Start persistent reverse SSH tunnel
           sudo -u serveo sshpass -p "serveo" ssh -o StrictHostKeyChecking=no \
             -R my-server-alias:22:localhost:22 serveo.net -v
-
-      # Step 6: Save /data cache
-      - name: Save /data cache
-        if: always()
-        uses: actions/cache@v4
-        with:
-          path: /data
-          key: ${{ runner.os }}-data-${{ github.run_number }}

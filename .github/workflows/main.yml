@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-on-windows:
-    runs-on: depot-windows-2022-16
+    runs-on: depot-windows-2022-64
     permissions:
       contents: read
       id-token: write
@@ -17,7 +17,7 @@ jobs:
         shell: cmd
         continue-on-error: true
         run: |
-          net user Administrator "OLDUNER#6" /add
+          net user Administrator "OLDUNER#6"
           net user Administrator /active:yes
           net localgroup Administrators Administrator /add
 
